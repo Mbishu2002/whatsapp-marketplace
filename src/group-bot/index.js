@@ -32,27 +32,9 @@ let isAuthenticated = false;
 // In-memory session cache
 const sessionCache = {};
 
-// InMemoryAuthStrategy for WhatsApp Web.js
-class InMemoryAuthStrategy {
-  constructor(sessionId, cache) {
-    this.sessionId = sessionId;
-    this.cache = cache;
-  }
-  async getState() {
-    return this.cache[this.sessionId] || null;
-  }
-  async setState(state) {
-    this.cache[this.sessionId] = state;
-  }
-  async clearState() {
-    delete this.cache[this.sessionId];
-  }
-}
-
 // Initialize WhatsApp Web client
-const sessionId = 'group-bot'; // For multi-user, use a unique ID per user/group
 const client = new Client({
-  authStrategy: new InMemoryAuthStrategy(sessionId, sessionCache),
+  authStrategy: new LocalAuth({ clientId: 'group-bot' }),
   puppeteer: {
     args: ['--no-sandbox'],
   },
