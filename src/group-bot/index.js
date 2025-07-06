@@ -6,8 +6,6 @@ const { users, listings } = require('../database/schema');
 const listingParser = require('./listing-parser');
 const fs = require('fs');
 const path = require('path');
-const redis = require('redis');
-const { promisify } = require('util');
 require('dotenv').config();
 
 // Create Express router
