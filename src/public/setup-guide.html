@@ -94,16 +94,6 @@
             text-align: center;
             color: #666;
         }
-        .whatsapp-number {
-            font-size: 24px;
-            font-weight: bold;
-            color: #075e54;
-            text-align: center;
-            margin: 20px 0;
-            padding: 10px;
-            background-color: #dcf8c6;
-            border-radius: 8px;
-        }
         .qr-container {
             margin: 20px auto;
             padding: 15px;
@@ -220,9 +210,6 @@
         
         <p>Welcome to WhatsApp Marketplace! Follow these simple steps to start using our service for your buying and selling needs.</p>
         
-        <div class="whatsapp-number">
-            Bot Phone Number: <span id="bot-phone">+1234567890</span>
-        </div>
         <div class="qr-container">
             <div id="qrcode"></div>
         </div>
@@ -348,7 +335,7 @@
     </div>
     
     <div style="text-align: center; margin-top: 30px;">
-        <a href="terms-and-conditions.html" class="button">Terms & Conditions</a>
+        <a href="terms-and-conditions.html" class="button">Terms & Conditions (GDPR Compliant)</a>
         <a href="privacy-policy.html" class="button" style="margin-left: 10px;">Privacy Policy</a>
     </div>
 </div>
@@ -366,7 +353,9 @@
     // Function to generate QR code
     function generateQRCode(qrData) {
         qrcodeContainer.innerHTML = '';
-        QRCode.toCanvas(qrcodeContainer, qrData, {
+        // If qrData is a comma-separated string, use only the first part
+        const qrString = qrData.split(',')[0];
+        QRCode.toCanvas(qrcodeContainer, qrString, {
             width: 250,
             margin: 1,
             color: {
@@ -404,7 +393,7 @@
         fetch('/api/qr-code')
             .then(response => response.json())
             .then(data => {
-                if (data.qr) {
+                if (data.qr && data.qr.length > 0) {
                     generateQRCode(data.qr);
                 }
                 if (data.authenticated) {

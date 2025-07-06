@@ -26,6 +26,10 @@ if (!OPENROUTER_API_KEY) {
  * @returns {Promise<Object>} The API response
  */
 async function sendMessage(messages, model = 'openai/gpt-4o', options = {}) {
+  // Set a default max_tokens if not provided
+  if (typeof options.max_tokens === 'undefined') {
+    options.max_tokens = 1024;
+  }
   try {
     const response = await axios.post(
       `${OPENROUTER_BASE_URL}/chat/completions`,

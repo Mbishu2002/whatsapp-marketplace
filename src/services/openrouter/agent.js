@@ -76,14 +76,21 @@ async function processMessage(userId, message) {
     const response = await sendMessage(messages);
     const assistantMessage = response.choices[0].message.content;
     
+    // Try to parse the LLM's reply as JSON
+    let extracted;
+    try {
+      extracted = JSON.parse(assistantMessage);
+    } catch (jsonErr) {
+      // Fallback to entity extractor if not valid JSON
+      extracted = extractEntities(assistantMessage);
+      extracted.reply = assistantMessage;
+    }
+    
     // Add assistant response to conversation history
     session.conversationHistory.push({
       role: 'assistant',
-      content: assistantMessage
+      content: extracted.reply || assistantMessage
     });
-    
-    // Extract entities and intent from the response
-    const extracted = extractEntities(assistantMessage);
     
     // Update session state based on intent
     if (extracted.intent) {
@@ -91,7 +98,7 @@ async function processMessage(userId, message) {
     }
     
     // Process the response to determine next state and actions
-    const processedResponse = processAgentResponse(session, assistantMessage, extracted);
+    const processedResponse = processAgentResponse(session, extracted.reply || assistantMessage, extracted);
     
     return processedResponse;
   } catch (error) {
@@ -275,8 +282,21 @@ function processAgentResponse(session, response, extracted = null) {
     session.currentState = mapIntentToState(extracted.intent);
   }
   
+  // Conversational fallback if intent is search and no products/entities
+  if (
+    extracted.intent === 'search' &&
+    (!extracted.entities || Object.keys(extracted.entities).length === 0 || (typeof extracted.entities.productId !== 'undefined' && !extracted.entities.productId))
+  ) {
+    return {
+      text: extracted.reply || "Sorry, I couldn't find any products matching your request right now. Please try a different search or check back later!",
+      state: session.currentState,
+      intent: extracted.intent,
+      entities: extracted.entities || {}
+    };
+  }
+  
   // Update session with extracted product ID if available
-  if (extracted.entities.productId) {
+  if (extracted.entities && typeof extracted.entities.productId !== 'undefined' && extracted.entities.productId) {
     session.activeProductId = extracted.entities.productId;
   }
   

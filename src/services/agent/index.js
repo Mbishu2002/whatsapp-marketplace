@@ -103,7 +103,12 @@ async function processMessage(userId, message) {
   
   // If OpenRouter is enabled, use the OpenRouter agent for message processing
   if (USE_OPENROUTER) {
-    return openRouterAgent.processMessage(userId, message);
+    try {
+      return await openRouterAgent.processMessage(userId, message);
+    } catch (err) {
+      console.error('Error processing message with OpenRouter agent:', err);
+      // Fallback to built-in logic below
+    }
   }
   
   // Get or create user session

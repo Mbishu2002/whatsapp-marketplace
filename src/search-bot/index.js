@@ -54,6 +54,9 @@ router.get('/webhook', (req, res) => {
 
 // Webhook for receiving messages
 router.post('/webhook', async (req, res) => {
+  console.log('--- Incoming webhook POST ---');
+  console.log('Headers:', JSON.stringify(req.headers, null, 2));
+  console.log('Body:', JSON.stringify(req.body, null, 2));
   // Return a '200 OK' response to all requests
   res.status(200).send('EVENT_RECEIVED');
 
@@ -67,42 +70,34 @@ router.post('/webhook', async (req, res) => {
         // Handle changes
         if (entry.changes && entry.changes.length > 0) {
           const change = entry.changes[0];
-          
+          console.log('Change:', JSON.stringify(change, null, 2));
           // Check if this is a message
           if (change.value && change.value.messages && change.value.messages.length > 0) {
             const message = change.value.messages[0];
             const phoneNumber = message.from;
-            
+            console.log(`Processing message from ${phoneNumber}:`, JSON.stringify(message, null, 2));
             // Process text messages
             if (message.type === 'text') {
               const messageText = message.text.body;
-              console.log(`Received message from ${phoneNumber}: ${messageText}`);
-              
+              console.log(`Received text message from ${phoneNumber}: ${messageText}`);
               try {
-                // Check if this is a group registration command
                 if (isGroupCommand(messageText, phoneNumber)) {
-                  // Process group registration command
                   const response = await processGroupCommand(phoneNumber, messageText);
-                  
-                  // Send the response back to the user
+                  console.log('Group command response:', JSON.stringify(response, null, 2));
                   if (response) {
                     await sendWhatsAppMessage(phoneNumber, response);
                   } else {
-                    // If not a recognized group command, process as regular message
                     const response = await processMessage(phoneNumber, messageText);
+                    console.log('Agent response (fallback):', JSON.stringify(response, null, 2));
                     await sendWhatsAppMessage(phoneNumber, response);
                   }
                 } else {
-                  // Process the message using our agent system
                   const response = await processMessage(phoneNumber, messageText);
-                  
-                  // Send the response back to the user
+                  console.log('Agent response:', JSON.stringify(response, null, 2));
                   await sendWhatsAppMessage(phoneNumber, response);
                 }
               } catch (error) {
                 console.error('Error processing message:', error);
-                
-                // Send a fallback message
                 await sendWhatsAppMessage(phoneNumber, {
                   text: "Sorry, I'm having trouble processing your request right now. Please try again later.",
                   actions: [
@@ -117,19 +112,13 @@ router.post('/webhook', async (req, res) => {
                      message.interactive.type === 'button_reply') {
               const buttonId = message.interactive.button_reply.id;
               const buttonText = message.interactive.button_reply.title;
-              
               console.log(`Received button click from ${phoneNumber}: ${buttonText} (${buttonId})`);
-              
               try {
-                // Process the button click as a message
                 const response = await processMessage(phoneNumber, buttonText);
-                
-                // Send the response back to the user
+                console.log('Button response:', JSON.stringify(response, null, 2));
                 await sendWhatsAppMessage(phoneNumber, response);
               } catch (error) {
                 console.error('Error processing button click:', error);
-                
-                // Send a fallback message
                 await sendWhatsAppMessage(phoneNumber, {
                   text: "Sorry, I'm having trouble processing your request right now. Please try again later.",
                   actions: [
@@ -142,8 +131,6 @@ router.post('/webhook', async (req, res) => {
             // Handle other message types (media, location, etc.)
             else {
               console.log(`Received unsupported message type from ${phoneNumber}: ${message.type}`);
-              
-              // Send a fallback message
               await sendWhatsAppMessage(phoneNumber, {
                 text: "Sorry, I can only process text messages right now. Please send your query as text.",
                 actions: [
@@ -163,16 +150,17 @@ router.post('/webhook', async (req, res) => {
 /**
  * Send a message to a WhatsApp user
  * @param {string} to - The recipient's phone number
- * @param {Object} response - The response object from the agent
+ * @param {Object} responseObj - The response object from the agent
  */
-async function sendWhatsAppMessage(to, response) {
+async function sendWhatsAppMessage(to, responseObj) {
   try {
-    // Extract text and actions from the response
-    const { text, actions } = response;
-    
+    // Support both 'text' and 'reply' fields for agent responses
+    const text = responseObj?.text || responseObj?.reply;
+    const actions = responseObj?.actions;
+
     // Prepare the message payload
     let messageData;
-    
+
     // If we have actions, create an interactive message
     if (actions && actions.length > 0) {
       // WhatsApp only supports up to 3 buttons
@@ -183,7 +171,7 @@ async function sendWhatsAppMessage(to, response) {
           title: action.text
         }
       }));
-      
+
       messageData = {
         messaging_product: 'whatsapp',
         recipient_type: 'individual',
@@ -192,7 +180,7 @@ async function sendWhatsAppMessage(to, response) {
         interactive: {
           type: 'button',
           body: {
-            text
+            text: text || "Sorry, I couldn't generate a response."
           },
           action: {
             buttons
@@ -207,13 +195,13 @@ async function sendWhatsAppMessage(to, response) {
         to,
         type: 'text',
         text: {
-          body: text
+          body: text || "Sorry, I couldn't generate a response."
         }
       };
     }
-    
+
     // Send the message
-    const response = await axios.post(
+    const apiResponse = await axios.post(
       `https://graph.facebook.com/v17.0/${WHATSAPP_PHONE_NUMBER_ID}/messages`,
       messageData,
       {
@@ -223,8 +211,8 @@ async function sendWhatsAppMessage(to, response) {
         }
       }
     );
-    
-    console.log(`Message sent to ${to}:`, response.data);
+
+    console.log(`Message sent to ${to}:`, apiResponse.data);
   } catch (error) {
     console.error('Error sending WhatsApp message:', error.response?.data || error.message);
   }
