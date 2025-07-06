@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WhatsApp Marketplace Setup Guide</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            color: #333;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background-color: white;
+            border-radius: 10px;
+            padding: 30px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #075e54;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .step {
+            margin-bottom: 40px;
+            position: relative;
+        }
+        .step-number {
+            background-color: #25d366;
+            color: white;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            font-weight: bold;
+            position: absolute;
+            left: -20px;
+            top: -5px;
+        }
+        .step-content {
+            margin-left: 30px;
+            background-color: #f8f8f8;
+            padding: 20px;
+            border-radius: 8px;
+            border-left: 4px solid #25d366;
+        }
+        h2 {
+            color: #128c7e;
+            margin-top: 0;
+        }
+        .image-container {
+            margin: 20px 0;
+            text-align: center;
+        }
+        .image-container img {
+            max-width: 100%;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
+        .tip {
+            background-color: #dcf8c6;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        .tip strong {
+            color: #075e54;
+        }
+        .button {
+            background-color: #25d366;
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 30px;
+            font-size: 16px;
+            cursor: pointer;
+            display: inline-block;
+            margin-top: 10px;
+            text-decoration: none;
+            transition: background-color 0.3s;
+        }
+        .button:hover {
+            background-color: #128c7e;
+        }
+        .footer {
+            margin-top: 50px;
+            text-align: center;
+            color: #666;
+        }
+        .whatsapp-number {
+            font-size: 24px;
+            font-weight: bold;
+            color: #075e54;
+            text-align: center;
+            margin: 20px 0;
+            padding: 10px;
+            background-color: #dcf8c6;
+            border-radius: 8px;
+        }
+        .qr-container {
+            margin: 20px auto;
+            padding: 15px;
+            background-color: white;
+            border-radius: 10px;
+            width: 280px;
+            height: 280px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        
+        /* Mobile-specific styles */
+        @media (max-width: 600px) {
+            body {
+                padding: 10px;
+            }
+            .container {
+                padding: 15px;
+            }
+            .step-number {
+                width: 30px;
+                height: 30px;
+                font-size: 16px;
+                left: -15px;
+            }
+            .step-content {
+                margin-left: 20px;
+                padding: 15px;
+            }
+            .qr-container {
+                width: 240px;
+                height: 240px;
+            }
+        }
+        
+        .device-options {
+            margin: 20px 0;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            justify-content: center;
+        }
+        
+        .device-option {
+            background-color: #f0f0f0;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            padding: 15px;
+            width: 45%;
+            min-width: 200px;
+            cursor: pointer;
+            text-align: center;
+            transition: all 0.3s ease;
+        }
+        
+        .device-option:hover, .device-option.selected {
+            border-color: #25d366;
+            background-color: #e8f5e9;
+        }
+        
+        .device-option h3 {
+            color: #075e54;
+            margin-top: 0;
+        }
+        
+        .setup-instructions {
+            margin-top: 20px;
+            display: none;
+        }
+        #qrcode {
+            margin: 0 auto;
+        }
+        .status {
+            margin: 15px 0;
+            padding: 12px;
+            border-radius: 8px;
+            font-weight: bold;
+        }
+        .waiting {
+            background-color: #fff9c4;
+            color: #f57c00;
+        }
+        .success {
+            background-color: #c8e6c9;
+            color: #2e7d32;
+            display: none;
+        }
+        .error {
+            background-color: #ffcdd2;
+            color: #c62828;
+            display: none;
+        }
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255,255,255,.3);
+            border-radius: 50%;
+            border-top-color: #25d366;
+            animation: spin 1s ease-in-out infinite;
+            margin-right: 10px;
+            vertical-align: middle;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>WhatsApp Marketplace Setup Guide</h1>
+        
+        <p>Welcome to WhatsApp Marketplace! Follow these simple steps to start using our service for your buying and selling needs.</p>
+        
+        <div class="whatsapp-number">
+            Bot Phone Number: <span id="bot-phone">+1234567890</span>
+        </div>
+        <div class="qr-container">
+            <div id="qrcode"></div>
+        </div>
+        <div class="status waiting" id="waiting-status">
+            <div class="loading"></div> Waiting for QR code...
+        </div>
+        <div class="status success" id="success-status" style="display:none;">
+            ✅ Successfully authenticated! The bot is now running.
+        </div>
+        <div class="status error" id="error-status" style="display:none;">
+            ❌ Authentication failed. Please try again.
+        </div>
+        
+        <div class="step-number">1</div>
+        <div class="step-content">
+            <h2>Save the Bot's Phone Number</h2>
+            <p>Add our marketplace bot's phone number to your contacts. This is the number shown above.</p>
+            <div class="image-container">
+                <img src="images/add-contact.jpg" alt="Adding contact to phone" id="add-contact-img">
+            </div>
+            <div class="tip">
+                <strong>Tip:</strong> Name the contact something memorable like "Marketplace Bot" so you can easily find it later.
+            </div>
+        </div>
+    </div>
+    
+    <div class="step">
+        <div class="step-number">2</div>
+        <div class="step-content">
+            <h2>Create or Choose a WhatsApp Group</h2>
+            <p>You can either:</p>
+            <ul>
+                <li>Create a new WhatsApp group for marketplace listings</li>
+                <li>Use an existing group where you want to enable marketplace features</li>
+            </ul>
+            <div class="image-container">
+                <img src="images/create-group.jpg" alt="Creating a WhatsApp group" id="create-group-img">
+            </div>
+            <div class="tip">
+                <strong>Tip:</strong> Groups with specific categories (e.g., "Electronics Marketplace" or "Fashion Items") work best!
+            </div>
+        </div>
+    </div>
+    
+    <div class="step">
+        <div class="step-number">3</div>
+        <div class="step-content">
+            <h2>Add the Bot to Your Group</h2>
+            <p>Open your WhatsApp group, tap the group name at the top, then:</p>
+            <ol>
+                <li>Scroll down and tap "Add participant"</li>
+                <li>Find and select the marketplace bot contact you saved earlier</li>
+                <li>Tap the checkmark or "Add" button to confirm</li>
+            </ol>
+            <div class="image-container">
+                <img src="images/add-bot.jpg" alt="Adding bot to group" id="add-bot-img">
+            </div>
+        </div>
+    </div>
+    
+    <div class="step">
+        <div class="step-number">4</div>
+        <div class="step-content">
+            <h2>Register Your Group</h2>
+            <p>Send the following message in your group:</p>
+            <div class="tip">
+                <strong>!register [category]</strong><br>
+                Example: !register electronics
+            </div>
+            <p>Available categories: electronics, fashion, vehicles, property, services, jobs, furniture, other</p>
+            <div class="image-container">
+                <img src="images/register-group.jpg" alt="Registering group" id="register-group-img">
+            </div>
+            <p>The bot will confirm when your group has been registered successfully.</p>
+        </div>
+    </div>
+    
+    <div class="step">
+        <div class="step-number">5</div>
+        <div class="step-content">
+            <h2>Start Posting Listings!</h2>
+            <p>Now you can post product listings in your group. The bot will automatically detect and extract listing information.</p>
+            <p>A good listing format includes:</p>
+            <ul>
+                <li>Clear product title</li>
+                <li>Price</li>
+                <li>Description</li>
+                <li>Location</li>
+                <li>Photos of the item</li>
+            </ul>
+            <div class="image-container">
+                <img src="images/post-listing.jpg" alt="Posting a listing" id="post-listing-img">
+            </div>
+            <div class="tip">
+                <strong>Example:</strong><br>
+                FOR SALE: Samsung Galaxy S22<br>
+                Price: 350,000 FCFA<br>
+                Condition: Used (9/10)<br>
+                Location: Douala<br>
+                Description: 8GB RAM, 128GB storage, comes with charger and case. No scratches.<br>
+                Contact: Already included in your WhatsApp profile
+            </div>
+        </div>
+    </div>
+    
+    <div class="step">
+        <div class="step-number">6</div>
+        <div class="step-content">
+            <h2>Search for Products</h2>
+            <p>To search for products across all marketplace groups, start a private chat with the bot and send a message like:</p>
+            <div class="tip">
+                <strong>search [product name]</strong><br>
+                Example: search iphone
+            </div>
+            <div class="image-container">
+                <img src="images/search-products.jpg" alt="Searching for products" id="search-products-img">
+            </div>
+        </div>
+    </div>
+    
+    <div class="tip" style="margin-top: 40px;">
+        <strong>Need help?</strong> If you have any questions or issues setting up the marketplace bot, send a message to our support team at <strong>support@whatsapp-marketplace.com</strong> or WhatsApp <strong>+1234567890</strong>.
+    </div>
+    
+    <div style="text-align: center; margin-top: 30px;">
+        <a href="terms-and-conditions.html" class="button">Terms & Conditions</a>
+        <a href="privacy-policy.html" class="button" style="margin-left: 10px;">Privacy Policy</a>
+    </div>
+</div>
+
+<div class="footer">
+    <p>© 2025 WhatsApp Marketplace. All rights reserved.</p>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.1/build/qrcode.min.js"></script>
+<script>
+    const qrcodeContainer = document.getElementById('qrcode');
+    const waitingStatus = document.getElementById('waiting-status');
+    const successStatus = document.getElementById('success-status');
+    const errorStatus = document.getElementById('error-status');
+    // Function to generate QR code
+    function generateQRCode(qrData) {
+        qrcodeContainer.innerHTML = '';
+        QRCode.toCanvas(qrcodeContainer, qrData, {
+            width: 250,
+            margin: 1,
+            color: {
+                dark: '#075E54',
+                light: '#ffffff'
+            }
+        }, function(error) {
+            if (error) {
+                console.error('Error generating QR code:', error);
+                errorStatus.style.display = 'block';
+                waitingStatus.style.display = 'none';
+            }
+        });
+        waitingStatus.style.display = 'block';
+        successStatus.style.display = 'none';
+        errorStatus.style.display = 'none';
+    }
+    // Function to check authentication status
+    function checkAuthStatus() {
+        fetch('/api/auth-status')
+            .then(response => response.json())
+            .then(data => {
+                if (data.authenticated) {
+                    waitingStatus.style.display = 'none';
+                    successStatus.style.display = 'block';
+                    qrcodeContainer.innerHTML = '<img src="/images/check-mark.png" alt="Authenticated" style="width: 100px;">';
+                }
+            })
+            .catch(error => {
+                console.error('Error checking auth status:', error);
+            });
+    }
+    // Poll for QR code
+    function pollForQRCode() {
+        fetch('/api/qr-code')
+            .then(response => response.json())
+            .then(data => {
+                if (data.qr) {
+                    generateQRCode(data.qr);
+                }
+                if (data.authenticated) {
+                    waitingStatus.style.display = 'none';
+                    successStatus.style.display = 'block';
+                    qrcodeContainer.innerHTML = '<img src="/images/check-mark.png" alt="Authenticated" style="width: 100px;">';
+                    return;
+                }
+                setTimeout(pollForQRCode, 5000);
+            })
+            .catch(error => {
+                console.error('Error fetching QR code:', error);
+                setTimeout(pollForQRCode, 5000);
+            });
+    }
+    pollForQRCode();
+    setInterval(checkAuthStatus, 10000);
+</script>
+</body>
+</html>
