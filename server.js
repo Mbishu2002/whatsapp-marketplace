@@ -123,13 +123,13 @@ app.get('/api/bot-info', (req, res) => {
   });
 });
 
-// QR code API endpoint
-app.get('/api/qr-code', (req, res) => {
-  if (groupBot && groupBot.getQRCode) {
-    res.json(groupBot.getQRCode());
+// Pairing code API endpoint (primary authentication method)
+app.get('/api/pairing-code', (req, res) => {
+  if (groupBot && groupBot.getPairingCode) {
+    res.json(groupBot.getPairingCode());
   } else {
     res.status(503).json({
-      error: 'Group bot not available',
+      error: 'Group bot not available or pairing code authentication not supported',
       authenticated: false
     });
   }

@@ -1,4 +1,4 @@
-const { Client, LocalAuth } = require('whatsapp-web.js');
+const { Client, RemoteAuth } = require('whatsapp-web.js');
 const qrcode = require('qrcode-terminal');
 const express = require('express');
 const supabase = require('../database/supabase');
@@ -8,8 +8,21 @@ const fs = require('fs');
 const path = require('path');
 require('dotenv').config();
 
+// Import session manager for multi-session support
+const sessionManager = require('./session-manager');
+
+// Import WhatsApp routes
+const whatsappRoutes = require('./routes');
+
+// Import MongoDB modules for session storage
+const { MongoStore } = require('wwebjs-mongo');
+const { connectToMongoDB, mongoose } = require('../database/mongodb');
+
 // Create Express router
 const router = express.Router();
+
+// Use WhatsApp routes
+router.use('/api/whatsapp', whatsappRoutes);
 
 // Import OpenRouter agent if available
 let openRouterAgent;
@@ -28,50 +41,110 @@ const ONLY_PROCESS_OWN_MESSAGES = process.env.ONLY_PROCESS_OWN_MESSAGES === 'tru
 // Store the latest QR code and authentication status
 let latestQR = null;
 let isAuthenticated = false;
+let latestPairingCode = null;
 
 // In-memory session cache
 const sessionCache = {};
 
-// Initialize WhatsApp Web client
-const client = new Client({
-  authStrategy: new LocalAuth({ clientId: 'group-bot' }),
-  puppeteer: {
-    args: ['--no-sandbox'],
-  },
-  qrMaxRetries: 5,
-  takeoverOnConflict: true,
-  takeoverTimeoutMs: 10000,
-});
+// Initialize WhatsApp Web client with RemoteAuth
+let client;
+
+// Function to initialize the client with MongoDB store
+async function initializeClient() {
+  try {
+    // Connect to MongoDB first
+    await connectToMongoDB();
+    
+    // Create a MongoDB store for WhatsApp sessions
+    const store = new MongoStore({ mongoose: mongoose });
+    
+    // Initialize the WhatsApp client with RemoteAuth
+    client = new Client({
+      authStrategy: new RemoteAuth({
+        store: store,
+        clientId: 'group-bot',
+        backupSyncIntervalMs: 300000 // Backup every 5 minutes
+      }),
+      puppeteer: {
+        args: ['--no-sandbox'],
+      },
+      qrMaxRetries: 5,
+      takeoverOnConflict: true,
+      takeoverTimeoutMs: 10000,
+    });
+    
+    // Set up event handlers
+    setupEventHandlers();
+    
+    // Initialize the client
+    console.log('Initializing WhatsApp Web client with MongoDB session storage...');
+    client.initialize();
+    
+    return client;
+  } catch (error) {
+    console.error('Failed to initialize WhatsApp client with MongoDB:', error);
+    throw error;
+  }
+}
 
 // Set up event handlers
-client.on('qr', (qr) => {
-  console.log('QR RECEIVED. Scan this QR code in WhatsApp to log in:');
-  qrcode.generate(qr, { small: true });
+function setupEventHandlers() {
+  client.on('qr', async (qr) => {
+    console.log('QR RECEIVED. Using pairing code authentication only.');
+    latestQR = qr;
+    isAuthenticated = false;
+    // Only generate pairing code if defaultPhone is set
+    const defaultPhone = process.env.DEFAULT_PHONE_NUMBER;
+    if (defaultPhone) {
+      try {
+        console.log(`Requesting pairing code for phone: ${defaultPhone}`);
+        latestPairingCode = await client.requestPairingCode(defaultPhone);
+        console.log(`✅ PAIRING CODE GENERATED: ${latestPairingCode}`);
+        console.log(`📱 Open WhatsApp on your phone > Settings > Linked Devices > Link a Device`);
+        console.log(`📝 When prompted for the pairing code, enter: ${latestPairingCode}`);
+      } catch (error) {
+        console.error('Failed to generate pairing code:', error);
+      }
+    } else {
+      console.error('No phone number provided for pairing code authentication. Cannot generate pairing code.');
+    }
+  });
+
+  client.on('ready', async () => {
+    console.log('Group bot client is ready!');
+    isAuthenticated = true;
+    latestQR = null; // Clear QR code once authenticated
+    latestPairingCode = null; // Clear pairing code once authenticated
+    
+    // Load monitored groups from database
+    await loadMonitoredGroups();
+  });
+
+  client.on('authenticated', () => {
+    console.log('Group bot authenticated');
+    isAuthenticated = true;
+    latestQR = null; // Clear QR code once authenticated
+    latestPairingCode = null; // Clear pairing code once authenticated
+  });
+
+  client.on('auth_failure', (msg) => {
+    console.error('Authentication failure:', msg);
+  });
   
-  // Store the QR code for web access
-  console.log('Storing new QR code for web access');
-  latestQR = qr;
-  isAuthenticated = false;
-});
-
-client.on('ready', async () => {
-  console.log('Group bot client is ready!');
-  isAuthenticated = true;
-  latestQR = null; // Clear QR code once authenticated
+  // Add remote auth specific events
+  client.on('remote_session_saved', () => {
+    console.log('Session saved to MongoDB');
+  });
   
-  // Load monitored groups from database
-  await loadMonitoredGroups();
-});
+  // Listen for all messages
+  client.on('message', onMessage);
 
-client.on('authenticated', () => {
-  console.log('Group bot authenticated');
-  isAuthenticated = true;
-  latestQR = null; // Clear QR code once authenticated
-});
-
-client.on('auth_failure', (msg) => {
-  console.error('Authentication failure:', msg);
-});
+  // Listen for messages created by the bot's own account
+  client.on('message_create', (message) => {
+    console.log('Message created by bot account:', message.body);
+    onMessage(message);
+  });
+}
 
 // Track groups we're monitoring
 const monitoredGroups = new Set();
@@ -453,34 +526,79 @@ async function onMessage(message) {
   }
 }
 
-// Listen for all messages
-client.on('message', onMessage);
-
-// Listen for messages created by the bot's own account
-client.on('message_create', (message) => {
-  console.log('Message created by bot account:', message.body);
-  onMessage(message);
-});
+// These event handlers are now set up in the setupEventHandlers function
 
 // Initialize and export the client
-function initialize() {
-  console.log('Initializing WhatsApp Web client...');
-  client.initialize();
-  return client;
+async function initialize() {
+  try {
+    // If client is already initialized, return it
+    if (client) return client;
+    
+    // Otherwise initialize with MongoDB
+    return await initializeClient();
+  } catch (error) {
+    console.error('Error initializing WhatsApp client:', error);
+    throw error;
+  }
 }
 
 // Initialize the client immediately
-initialize();
+initialize().catch(err => {
+  console.error('Failed to initialize WhatsApp client:', err);
+});
 
 /**
- * Get the current QR code for authentication
+ * Get the current QR code for authentication (deprecated)
  * @returns {Object} Object containing QR code and authentication status
+ * @deprecated Use getPairingCode() instead
  */
 function getQRCode() {
   return {
     qr: latestQR,
+    pairingCode: latestPairingCode, // Include pairing code if available
+    authenticated: isAuthenticated,
+    deprecated: true,
+    message: 'QR code authentication is deprecated, please use pairing code instead'
+  };
+}
+
+/**
+ * Get the current pairing code for authentication
+ * @returns {Object} Object containing pairing code and authentication status
+ */
+function getPairingCode() {
+  return {
+    pairingCode: latestPairingCode,
     authenticated: isAuthenticated
   };
+}
+
+/**
+ * Request a pairing code for phone number authentication
+ * @param {string} phoneNumber - Phone number in international format without symbols
+ * @returns {Promise<string|null>} The pairing code or null if failed
+ */
+async function requestPairingCode(phoneNumber) {
+  try {
+    if (!client) {
+      console.error('Client not initialized');
+      return null;
+    }
+    
+    if (isAuthenticated) {
+      console.log('Already authenticated, no need for pairing code');
+      return null;
+    }
+    
+    // Request pairing code from WhatsApp
+    latestPairingCode = await client.requestPairingCode(phoneNumber);
+    console.log(`Pairing code generated: ${latestPairingCode}`);
+    
+    return latestPairingCode;
+  } catch (error) {
+    console.error('Error requesting pairing code:', error);
+    return null;
+  }
 }
 
 /**
@@ -493,21 +611,70 @@ function getAuthStatus() {
   };
 }
 
-// API endpoints for QR code and authentication status
+// API endpoints for QR code and authentication status (deprecated but kept for backward compatibility)
 router.get('/api/group-bot/qr-code', (req, res) => {
-  console.log('QR code endpoint called, QR available:', !!latestQR, 'Authenticated:', isAuthenticated);
-  if (latestQR) {
-    res.json({ qrCode: latestQR, authenticated: false });
+  console.log('QR code endpoint called (deprecated), Authenticated:', isAuthenticated);
+  if (latestPairingCode) {
+    // Prioritize pairing code if available
+    res.json({ pairingCode: latestPairingCode, authenticated: false, message: 'Use pairing code authentication instead of QR code' });
+  } else if (latestQR) {
+    // Fall back to QR code if pairing code not available
+    res.json({ qrCode: latestQR, authenticated: false, message: 'QR code authentication is deprecated, please use pairing code instead' });
   } else if (isAuthenticated) {
     res.json({ authenticated: true, message: 'Already authenticated' });
   } else {
     // Return 200 status with waiting message instead of 404
-    res.json({ waiting: true, message: 'Waiting for QR code generation...' });
+    res.json({ waiting: true, message: 'Waiting for authentication code generation...' });
   }
 });
 
 router.get('/api/group-bot/auth-status', (req, res) => {
   res.json({ authenticated: isAuthenticated });
+});
+
+// Pairing code endpoints (primary authentication method)
+router.get('/api/group-bot/pairing-code', (req, res) => {
+  console.log('Pairing code endpoint called, code available:', !!latestPairingCode, 'Authenticated:', isAuthenticated);
+  if (latestPairingCode) {
+    res.json({ 
+      pairingCode: latestPairingCode, 
+      authenticated: false,
+      instructions: [
+        "Open WhatsApp on your phone",
+        "Go to Settings > Linked Devices > Link a Device",
+        `When prompted, enter the pairing code: ${latestPairingCode}`
+      ]
+    });
+  } else if (isAuthenticated) {
+    res.json({ authenticated: true, message: 'Already authenticated' });
+  } else {
+    res.json({ waiting: true, message: 'No pairing code available. Request one first.' });
+  }
+});
+
+router.post('/api/group-bot/request-pairing-code', async (req, res) => {
+  try {
+    const { phoneNumber } = req.body;
+    
+    if (!phoneNumber) {
+      return res.status(400).json({ error: 'Phone number is required' });
+    }
+    
+    // Format phone number (remove any non-numeric characters)
+    const formattedPhone = phoneNumber.replace(/\D/g, '');
+    
+    // Request pairing code
+    const pairingCode = await requestPairingCode(formattedPhone);
+    
+    if (!pairingCode) {
+      return res.status(500).json({ error: 'Failed to generate pairing code' });
+    }
+    
+    res.json({ pairingCode });
+  } catch (error) {
+    console.error('Error requesting pairing code:', error);
+    res.status(500).json({ error: 'Failed to request pairing code' });
+  }
 });
 
 // Get the latest QR code
@@ -525,6 +692,9 @@ module.exports = {
   client,
   addMonitoredGroup,
   getQRCode,
+  getPairingCode,
+  requestPairingCode,
   getAuthStatus,
-  router
+  router,
+  sessionManager
 };
