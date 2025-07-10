@@ -32,6 +32,17 @@ try {
 const app = express();
 app.use(bodyParser.json());
 
+// Add request logging middleware
+app.use((req, res, next) => {
+  const start = Date.now();
+  console.log(`[REQ] ${req.method} ${req.originalUrl}`);
+  res.on('finish', () => {
+    const duration = Date.now() - start;
+    console.log(`[RES] ${req.method} ${req.originalUrl} - ${res.statusCode} (${duration}ms)`);
+  });
+  next();
+});
+
 // Serve static files from public directory
 app.use(express.static(path.join(__dirname, 'src/public')));
 

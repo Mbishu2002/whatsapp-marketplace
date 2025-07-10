@@ -7,7 +7,7 @@ const mongoose = require('mongoose');
 require('dotenv').config();
 
 // Get MongoDB connection string from environment variables
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/whatsapp-marketplace';
+const MONGODB_URI = process.env.MONGODB_URI;
 
 // Connect to MongoDB
 async function connectToMongoDB() {
