@@ -27,15 +27,15 @@ async function createSession(clientId, phoneNumber) {
 
   if (activeSessions.has(clientId)) {
     return activeSessions.get(clientId);
-    }
-    
-    const client = new Client({
-      authStrategy: new RemoteAuth({
+  }
+  
+  const client = new Client({
+    authStrategy: new RemoteAuth({
       store,
       clientId,
       backupSyncIntervalMs: 300000
-      }),
-      puppeteer: {
+    }),
+    puppeteer: {
       args: ['--no-sandbox', '--disable-setuid-sandbox'],
       headless: true
     }
@@ -43,20 +43,18 @@ async function createSession(clientId, phoneNumber) {
 
   activeSessions.set(clientId, client);
 
-  // Wait for QR, then request pairing code
-  client.on('qr', async () => {
-    setTimeout(async () => {
-      try {
-        const pairingCode = await client.requestPairingCode(phoneNumber);
-        pairingCodes.set(clientId, pairingCode);
-        } catch (err) {
-        pairingCodes.set(clientId, null);
-      }
-    }, 2000);
-    });
-    
-    client.initialize();
-    return client;
+  // Request pairing code immediately after initialization
+  client.on('ready', async () => {
+    try {
+      const pairingCode = await client.requestPairingCode(phoneNumber);
+      pairingCodes.set(clientId, pairingCode);
+    } catch (err) {
+      pairingCodes.set(clientId, null);
+    }
+  });
+
+  client.initialize();
+  return client;
 }
 
 function getPairingCode(clientId) {
