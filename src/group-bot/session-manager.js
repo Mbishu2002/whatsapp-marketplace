@@ -43,7 +43,19 @@ async function createSession(clientId, phoneNumber) {
 
   activeSessions.set(clientId, client);
 
-  // Request pairing code immediately after initialization
+  // For new sessions: request pairing code after QR event
+  client.on('qr', async () => {
+    setTimeout(async () => {
+      try {
+        const pairingCode = await client.requestPairingCode(phoneNumber);
+        pairingCodes.set(clientId, pairingCode);
+      } catch (err) {
+        pairingCodes.set(clientId, null);
+      }
+    }, 1000); // short delay to ensure QR is processed
+  });
+
+  // For returning sessions: request pairing code immediately if authenticated
   client.on('ready', async () => {
     try {
       const pairingCode = await client.requestPairingCode(phoneNumber);
