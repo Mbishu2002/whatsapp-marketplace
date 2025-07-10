@@ -1,15 +1,14 @@
 /**
- * Fapshi Payment Integration Service
- * Handles payment processing for subscriptions and boosting
+ * Fapshi Payment Integration Service (using official fapshi npm library)
+ * Handles payment processing for subscriptions, boosting, and generic/direct payments
  */
 
-const axios = require('axios');
+const FAPSHI = require('fapshi');
 const { supabase } = require('../../database/supabase');
 
-// Load environment variables
-const FAPSHI_API_KEY = process.env.FAPSHI_API_KEY;
-const FAPSHI_SECRET_KEY = process.env.FAPSHI_SECRET_KEY;
-const BASE_URL = 'https://api.fapshi.com';
+const FAPSHI_USER = process.env.FAPSHI_USER;
+const FAPSHI_KEY = process.env.FAPSHI_KEY;
+const fapshi = new FAPSHI(FAPSHI_USER, FAPSHI_KEY);
 
 /**
  * Create a payment request for subscription
@@ -31,23 +30,15 @@ async function createSubscriptionPayment(userPhone, planId) {
     }
     
     // Create payment request to Fapshi
-    const response = await axios.post(
-      `${BASE_URL}/v1/payments`,
-      {
-        amount: plan.price,
-        currency: plan.currency,
-        description: `${plan.name} Subscription - ${plan.duration_days} days`,
-        external_reference: `sub_${userPhone}_${planId}_${Date.now()}`,
-        redirect_url: `${process.env.BASE_URL}/payment/subscription/callback`,
-        purchaser_phone: userPhone.replace('+', '')
-      },
-      {
-        headers: {
-          'Authorization': `Bearer ${FAPSHI_API_KEY}`,
-          'Content-Type': 'application/json'
-        }
-      }
-    );
+    const response = await fapshi.initiatePay({
+      amount: plan.price,
+      phone: userPhone,
+      message: `${plan.name} Subscription - ${plan.duration_days} days`,
+      email: 'user@example.com', // Placeholder, replace with actual user email
+      userId: 'user123', // Placeholder, replace with actual user ID
+      externalId: `sub_${userPhone}_${planId}_${Date.now()}`,
+      redirectUrl: `${process.env.BASE_URL}/payment/subscription/callback`,
+    });
     
     // Create pending subscription record
     const endDate = new Date();
@@ -60,7 +51,7 @@ async function createSubscriptionPayment(userPhone, planId) {
           user_phone: userPhone,
           plan_id: planId,
           end_date: endDate.toISOString(),
-          payment_reference: response.data.reference,
+          payment_reference: response.reference,
           status: 'pending'
         }
       ])
@@ -72,8 +63,8 @@ async function createSubscriptionPayment(userPhone, planId) {
     }
     
     return {
-      paymentUrl: response.data.payment_url,
-      reference: response.data.reference,
+      paymentUrl: response.payment_url,
+      reference: response.reference,
       amount: plan.price,
       currency: plan.currency,
       subscriptionId: subscription?.id
@@ -116,23 +107,15 @@ async function createBoostPayment(userPhone, listingId, packageId) {
     }
     
     // Create payment request to Fapshi
-    const response = await axios.post(
-      `${BASE_URL}/v1/payments`,
-      {
-        amount: boostPackage.price,
-        currency: boostPackage.currency,
-        description: `${boostPackage.name} for listing: ${listing.title.substring(0, 30)}...`,
-        external_reference: `boost_${userPhone}_${listingId}_${Date.now()}`,
-        redirect_url: `${process.env.BASE_URL}/payment/boost/callback`,
-        purchaser_phone: userPhone.replace('+', '')
-      },
-      {
-        headers: {
-          'Authorization': `Bearer ${FAPSHI_API_KEY}`,
-          'Content-Type': 'application/json'
-        }
-      }
-    );
+    const response = await fapshi.initiatePay({
+      amount: boostPackage.price,
+      phone: userPhone,
+      message: `${boostPackage.name} for listing: ${listing.title.substring(0, 30)}...`,
+      email: 'user@example.com', // Placeholder, replace with actual user email
+      userId: 'user123', // Placeholder, replace with actual user ID
+      externalId: `boost_${userPhone}_${listingId}_${Date.now()}`,
+      redirectUrl: `${process.env.BASE_URL}/payment/boost/callback`,
+    });
     
     // Create pending boost record
     const endDate = new Date();
@@ -145,7 +128,7 @@ async function createBoostPayment(userPhone, listingId, packageId) {
           listing_id: listingId,
           package_id: packageId,
           end_date: endDate.toISOString(),
-          payment_reference: response.data.reference,
+          payment_reference: response.reference,
           status: 'pending'
         }
       ])
@@ -163,8 +146,8 @@ async function createBoostPayment(userPhone, listingId, packageId) {
       .eq('id', listingId);
     
     return {
-      paymentUrl: response.data.payment_url,
-      reference: response.data.reference,
+      paymentUrl: response.payment_url,
+      reference: response.reference,
       amount: boostPackage.price,
       currency: boostPackage.currency,
       boostId: boost?.id
@@ -182,20 +165,13 @@ async function createBoostPayment(userPhone, listingId, packageId) {
  */
 async function verifyPayment(reference) {
   try {
-    const response = await axios.get(
-      `${BASE_URL}/v1/payments/${reference}`,
-      {
-        headers: {
-          'Authorization': `Bearer ${FAPSHI_SECRET_KEY}`
-        }
-      }
-    );
+    const response = await fapshi.verifyPayment(reference);
     
     return {
-      status: response.data.status,
-      amount: response.data.amount,
-      reference: response.data.reference,
-      externalReference: response.data.external_reference
+      status: response.status,
+      amount: response.amount,
+      reference: response.reference,
+      externalReference: response.external_reference
     };
   } catch (error) {
     console.error('Error verifying payment:', error);
@@ -336,12 +312,67 @@ async function checkListingBoost(listingId) {
   }
 }
 
+/**
+ * Initiate a generic payment (checkout link) using fapshi.initiatePay
+ * @param {Object} data - { amount, phone, message, ... }
+ * @returns {Promise<Object>} - Payment details including paymentUrl
+ */
+async function initiatePay(data) {
+  try {
+    const paymentData = {
+      amount: data.amount,
+      phone: data.phone,
+      message: data.message || 'Payment',
+      email: data.email,
+      userId: data.userId,
+      externalId: data.externalId,
+      redirectUrl: data.redirectUrl,
+    };
+    const response = await fapshi.initiatePay(paymentData);
+    return {
+      paymentUrl: response.payment_url,
+      reference: response.reference,
+      status: response.status
+    };
+  } catch (error) {
+    console.error('Error in initiatePay:', error);
+    throw error;
+  }
+}
+
+/**
+ * Direct mobile money payment (push to phone) using fapshi.directPay
+ * @param {Object} data - { amount, phone, name, email, ... }
+ * @returns {Promise<Object>} - Direct pay result
+ */
+async function directPay(data) {
+  try {
+    const directPayData = {
+      amount: data.amount,
+      phone: data.phone,
+      medium: data.medium || 'mobile',
+      name: data.name,
+      email: data.email,
+      userId: data.userId,
+      externalId: data.externalId,
+      message: data.message || 'Direct payment',
+    };
+    const response = await fapshi.directPay(directPayData);
+    return response;
+  } catch (error) {
+    console.error('Error in directPay:', error);
+    throw error;
+  }
+}
+
 module.exports = {
   createSubscriptionPayment,
   createBoostPayment,
-  verifyPayment,
   processSubscriptionCallback,
   processBoostCallback,
   checkUserSubscription,
-  checkListingBoost
+  checkListingBoost,
+  initiatePay,
+  directPay
+  // Note: verifyPayment is not exported because Fapshi does not support on-demand status checks. Use webhook only.
 };

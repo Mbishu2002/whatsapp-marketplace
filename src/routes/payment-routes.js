@@ -220,4 +220,41 @@ router.get('/boost/packages', async (req, res) => {
   }
 });
 
+// Fapshi payment status webhook
+router.post('/fapshi/webhook', async (req, res) => {
+  try {
+    // Fapshi sends payment status updates here
+    const { reference, status } = req.body; // Adjust if Fapshi uses different keys
+    if (!reference || !status) {
+      return res.status(400).json({ success: false, message: 'Missing reference or status' });
+    }
+
+    // Find the payment session by reference
+    const { data: session, error } = await require('../database/supabase').supabase
+      .from('payment_sessions')
+      .select('*')
+      .eq('payment_reference', reference)
+      .single();
+
+    if (error || !session) {
+      console.error('Payment session not found for reference:', reference);
+      return res.status(404).json({ success: false, message: 'Session not found' });
+    }
+
+    // Update session status
+    await require('../database/supabase').supabase
+      .from('payment_sessions')
+      .update({ status })
+      .eq('id', session.id);
+
+    // TODO: Optionally notify the user via WhatsApp here
+    // Example: sendWhatsAppMessage(session.user_phone, `Your payment is now: ${status}`);
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Error in Fapshi webhook:', err);
+    res.status(500).json({ success: false, message: err.message || 'Webhook error' });
+  }
+});
+
 module.exports = router;

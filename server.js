@@ -39,6 +39,10 @@ app.use(express.static(path.join(__dirname, 'src/public')));
 const adminRoutes = require('./src/admin/group-management');
 app.use('/api/admin', adminRoutes);
 
+// Import payment routes for Fapshi webhook and payment endpoints
+const paymentRoutes = require('./src/routes/payment-routes');
+app.use('/api/payment', paymentRoutes); // Mount at /api/payment
+
 // Mount search bot routes if available
 if (searchBot && searchBot.router) {
   // Mount the search bot's router at the root path

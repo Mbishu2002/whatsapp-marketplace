@@ -7,6 +7,7 @@
 
 const { handleSubscriptionCommands } = require('../../search-bot/commands/subscription');
 const { handleBoostCommands } = require('../../search-bot/commands/boost');
+const { handleFapshiCommands } = require('../../search-bot/commands/fapshi');
 
 /**
  * Process a command message
@@ -35,6 +36,10 @@ async function processCommand(client, message, text) {
       
     case 'boost':
       await handleBoostCommands(client, message, args);
+      return true;
+
+    case 'fapshi':
+      await handleFapshiCommands(client, message, args);
       return true;
       
     // Add more command handlers here

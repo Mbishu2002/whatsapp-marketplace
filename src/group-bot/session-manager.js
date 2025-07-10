@@ -27,15 +27,15 @@ async function createSession(clientId, phoneNumber) {
 
   if (activeSessions.has(clientId)) {
     return activeSessions.get(clientId);
-  }
-
-  const client = new Client({
-    authStrategy: new RemoteAuth({
+    }
+    
+    const client = new Client({
+      authStrategy: new RemoteAuth({
       store,
       clientId,
       backupSyncIntervalMs: 300000
-    }),
-    puppeteer: {
+      }),
+      puppeteer: {
       args: ['--no-sandbox', '--disable-setuid-sandbox'],
       headless: true
     }
@@ -49,14 +49,14 @@ async function createSession(clientId, phoneNumber) {
       try {
         const pairingCode = await client.requestPairingCode(phoneNumber);
         pairingCodes.set(clientId, pairingCode);
-      } catch (err) {
+        } catch (err) {
         pairingCodes.set(clientId, null);
       }
     }, 2000);
-  });
-
-  client.initialize();
-  return client;
+    });
+    
+    client.initialize();
+    return client;
 }
 
 function getPairingCode(clientId) {
