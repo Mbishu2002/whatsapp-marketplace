@@ -225,8 +225,8 @@
         <div class="step">
             <div class="step-number">1</div>
             <div class="step-content">
-                <h2>Save the Bot's Phone Number</h2>
-                <p>Add our marketplace bot's phone number to your contacts. This is the number shown above.</p>
+                <h2>Save the Bot's Phone Number (for Groups)</h2>
+                <p>Add our marketplace bot's phone number to your contacts <b>only if you want to add the bot to a group</b>. This is <b>not required</b> for linking your own WhatsApp account.</p>
                 <div class="image-container">
                     <img src="images/add-contact.jpg" alt="Adding contact to phone" id="add-contact-img">
                 </div>
@@ -234,12 +234,25 @@
                     <strong>Tip:</strong> Name the contact something memorable like "Marketplace Bot" so you can easily find it later.
                 </div>
             </div>
+        </div>
+
+        <div class="step">
+            <div class="step-number">2</div>
+            <div class="step-content">
+                <h2>Link Your WhatsApp Account (Pairing Code)</h2>
+                <p>To link your WhatsApp account to the marketplace, enter your phone number below (in international format, e.g. <b>+12025550108</b>) and click <b>Request Pairing Code</b>:</p>
+                <input type="text" id="user-phone" placeholder="e.g. +12025550108" style="padding: 10px; font-size: 16px; border-radius: 6px; border: 1px solid #ccc; width: 250px;">
+                <button class="button" id="request-pairing">Request Pairing Code</button>
+                <div id="pairing-status" style="margin-top: 15px;"></div>
+                <div id="pairing-instructions" style="display:none; margin-top: 15px; background: #f8f8f8; padding: 15px; border-radius: 8px;"></div>
+                <div class="tip" style="background-color: #e3fcec; color: #256029; margin-top: 20px; border: 1px solid #b7ebc6;">
+                    <strong>Privacy Note:</strong> Your phone number is <u>not</u> stored by our system. It is used <b>only temporarily</b> to generate the WhatsApp linking code, just like WhatsApp Web. Your privacy is respected at all times.
+                </div>
             </div>
         </div>
-    </div>
     
     <div class="step">
-        <div class="step-number">2</div>
+        <div class="step-number">3</div>
         <div class="step-content">
             <h2>Create or Choose a WhatsApp Group</h2>
             <p>You can either:</p>
@@ -257,7 +270,7 @@
     </div>
     
     <div class="step">
-        <div class="step-number">3</div>
+        <div class="step-number">4</div>
         <div class="step-content">
             <h2>Add the Bot to Your Group</h2>
             <p>Open your WhatsApp group, tap the group name at the top, then:</p>
@@ -273,7 +286,7 @@
     </div>
     
     <div class="step">
-        <div class="step-number">4</div>
+        <div class="step-number">5</div>
         <div class="step-content">
             <h2>Register Your Group</h2>
             <p>Send the following message in your group:</p>
@@ -290,7 +303,7 @@
     </div>
     
     <div class="step">
-        <div class="step-number">5</div>
+        <div class="step-number">6</div>
         <div class="step-content">
             <h2>Start Posting Listings!</h2>
             <p>Now you can post product listings in your group. The bot will automatically detect and extract listing information.</p>
@@ -318,7 +331,7 @@
     </div>
     
     <div class="step">
-        <div class="step-number">6</div>
+        <div class="step-number">7</div>
         <div class="step-content">
             <h2>Search for Products</h2>
             <p>To search for products across all marketplace groups, start a private chat with the bot and send a message like:</p>
@@ -440,6 +453,50 @@
     
     pollForAuthCode();
     setInterval(checkAuthStatus, 10000);
+
+    // Pairing code request logic
+    document.getElementById('request-pairing').onclick = function() {
+        const phoneInput = document.getElementById('user-phone');
+        const phone = phoneInput.value.trim();
+        const statusDiv = document.getElementById('pairing-status');
+        const instructionsDiv = document.getElementById('pairing-instructions');
+        statusDiv.textContent = '';
+        instructionsDiv.style.display = 'none';
+        instructionsDiv.textContent = '';
+        if (!phone.match(/^\+?\d{10,15}$/)) {
+            statusDiv.textContent = 'Please enter a valid phone number in international format.';
+            statusDiv.style.color = '#c62828';
+            return;
+        }
+        statusDiv.textContent = 'Requesting pairing code...';
+        statusDiv.style.color = '#333';
+        fetch('/api/whatsapp/pair', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ phoneNumber: phone })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.pairingCode) {
+                statusDiv.textContent = 'Pairing code generated!';
+                statusDiv.style.color = '#2e7d32';
+                instructionsDiv.style.display = 'block';
+                instructionsDiv.innerHTML = `<b>Pairing Code:</b> <span style='font-size: 1.5em; color: #075e54;'>${data.pairingCode}</span><br><br>
+                <b>Session ID:</b> <span style='font-size: 1em; color: #888;'>${data.clientId}</span><br><br>
+                <b>Instructions:</b><ol><li>Open WhatsApp on your phone</li><li>Go to <b>Settings &gt; Linked Devices &gt; Link a Device</b></li><li>When prompted, enter the pairing code above</li></ol>`;
+            } else if (data.error) {
+                statusDiv.textContent = data.error;
+                statusDiv.style.color = '#c62828';
+            } else {
+                statusDiv.textContent = 'Failed to generate pairing code.';
+                statusDiv.style.color = '#c62828';
+            }
+        })
+        .catch(err => {
+            statusDiv.textContent = 'Error requesting pairing code.';
+            statusDiv.style.color = '#c62828';
+        });
+    };
 </script>
 </body>
 </html>

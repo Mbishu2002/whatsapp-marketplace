@@ -38,10 +38,9 @@ const USE_OPENROUTER = process.env.USE_OPENROUTER === 'true' && openRouterAgent;
 // Configuration for message filtering
 const ONLY_PROCESS_OWN_MESSAGES = process.env.ONLY_PROCESS_OWN_MESSAGES === 'true';
 
-// Store the latest QR code and authentication status
-let latestQR = null;
-let isAuthenticated = false;
+// Store the latest pairing code and authentication status
 let latestPairingCode = null;
+let isAuthenticated = false;
 
 // In-memory session cache
 const sessionCache = {};
@@ -89,41 +88,9 @@ async function initializeClient() {
 
 // Set up event handlers
 function setupEventHandlers() {
-  client.on('qr', async (qr) => {
-    console.log('QR RECEIVED. Using pairing code authentication only.');
-    latestQR = qr;
-    isAuthenticated = false;
-    // Only generate pairing code if defaultPhone is set
-    const defaultPhone = process.env.DEFAULT_PHONE_NUMBER;
-    if (defaultPhone) {
-      try {
-        console.log(`Requesting pairing code for phone: ${defaultPhone}`);
-        latestPairingCode = await client.requestPairingCode(defaultPhone);
-        console.log(`✅ PAIRING CODE GENERATED: ${latestPairingCode}`);
-        console.log(`📱 Open WhatsApp on your phone > Settings > Linked Devices > Link a Device`);
-        console.log(`📝 When prompted for the pairing code, enter: ${latestPairingCode}`);
-      } catch (error) {
-        console.error('Failed to generate pairing code:', error);
-      }
-    } else {
-      console.error('No phone number provided for pairing code authentication. Cannot generate pairing code.');
-    }
-  });
-
-  client.on('ready', async () => {
-    console.log('Group bot client is ready!');
-    isAuthenticated = true;
-    latestQR = null; // Clear QR code once authenticated
-    latestPairingCode = null; // Clear pairing code once authenticated
-    
-    // Load monitored groups from database
-    await loadMonitoredGroups();
-  });
-
   client.on('authenticated', () => {
     console.log('Group bot authenticated');
     isAuthenticated = true;
-    latestQR = null; // Clear QR code once authenticated
     latestPairingCode = null; // Clear pairing code once authenticated
   });
 
@@ -548,32 +515,6 @@ initialize().catch(err => {
 });
 
 /**
- * Get the current QR code for authentication (deprecated)
- * @returns {Object} Object containing QR code and authentication status
- * @deprecated Use getPairingCode() instead
- */
-function getQRCode() {
-  return {
-    qr: latestQR,
-    pairingCode: latestPairingCode, // Include pairing code if available
-    authenticated: isAuthenticated,
-    deprecated: true,
-    message: 'QR code authentication is deprecated, please use pairing code instead'
-  };
-}
-
-/**
- * Get the current pairing code for authentication
- * @returns {Object} Object containing pairing code and authentication status
- */
-function getPairingCode() {
-  return {
-    pairingCode: latestPairingCode,
-    authenticated: isAuthenticated
-  };
-}
-
-/**
  * Request a pairing code for phone number authentication
  * @param {string} phoneNumber - Phone number in international format without symbols
  * @returns {Promise<string|null>} The pairing code or null if failed
@@ -611,28 +552,7 @@ function getAuthStatus() {
   };
 }
 
-// API endpoints for QR code and authentication status (deprecated but kept for backward compatibility)
-router.get('/api/group-bot/qr-code', (req, res) => {
-  console.log('QR code endpoint called (deprecated), Authenticated:', isAuthenticated);
-  if (latestPairingCode) {
-    // Prioritize pairing code if available
-    res.json({ pairingCode: latestPairingCode, authenticated: false, message: 'Use pairing code authentication instead of QR code' });
-  } else if (latestQR) {
-    // Fall back to QR code if pairing code not available
-    res.json({ qrCode: latestQR, authenticated: false, message: 'QR code authentication is deprecated, please use pairing code instead' });
-  } else if (isAuthenticated) {
-    res.json({ authenticated: true, message: 'Already authenticated' });
-  } else {
-    // Return 200 status with waiting message instead of 404
-    res.json({ waiting: true, message: 'Waiting for authentication code generation...' });
-  }
-});
-
-router.get('/api/group-bot/auth-status', (req, res) => {
-  res.json({ authenticated: isAuthenticated });
-});
-
-// Pairing code endpoints (primary authentication method)
+// API endpoints for pairing code authentication
 router.get('/api/group-bot/pairing-code', (req, res) => {
   console.log('Pairing code endpoint called, code available:', !!latestPairingCode, 'Authenticated:', isAuthenticated);
   if (latestPairingCode) {
@@ -677,22 +597,10 @@ router.post('/api/group-bot/request-pairing-code', async (req, res) => {
   }
 });
 
-// Get the latest QR code
-function getLatestQR() {
-  return latestQR;
-}
-
-// Get authentication status
-function getAuthStatus() {
-  return isAuthenticated;
-}
-
 module.exports = {
   initialize,
   client,
   addMonitoredGroup,
-  getQRCode,
-  getPairingCode,
   requestPairingCode,
   getAuthStatus,
   router,
